@@ -1,4 +1,11 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
 asset/.DS_Store
 asset/examples/.DS_Store
 asset/examples/hdri_examples/.DS_Store
 asset/examples/image_examples/.DS_Store
+checkpoints/
+data/

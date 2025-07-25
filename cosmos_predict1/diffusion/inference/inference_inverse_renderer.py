@@ -204,7 +204,8 @@ def demo(args: argparse.Namespace):
             # Save output as video
             if args.save_video:
                 clip_name = data_batch['clip_name'][0].replace("/", "__")
-                video_save_path = os.path.join(args.video_save_folder, f"{clip_name}.{gbuffer_pass}.mp4")
+                chunk_ind_str = data_batch['chunk_index'][0] if 'chunk_index' in data_batch else '0000'
+                video_save_path = os.path.join(args.video_save_folder, f"{clip_name}.{chunk_ind_str}.{gbuffer_pass}.mp4")
                 save_image_or_video(
                     video_save_path=video_save_path,
                     video=output,
