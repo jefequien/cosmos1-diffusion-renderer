@@ -164,10 +164,12 @@ class DiffusionRendererPipeline(DiffusionText2WorldGenerationPipeline):
         print(video.shape)
         video = rearrange(video, "b c (n l) h w -> b c n l h w", l=57)
         # Only keep end of each clip because that part is most consistent
-        video = video[:,:,:,9+16:,...]
+        video = video[:,:,:,9+16+16:,...]
+        # video = video[:,:,:,9+16:,...]
         video = rearrange(video, "b c n l h w -> b c (n l) h w")
         # Move frames at the end to beginning to align with rgb video
-        video = torch.cat([video[:,:,-(9+16):,:,:], video[:,:,:-(9+16),:,:]], dim=2)
+        video = torch.cat([video[:,:,-(9+16+16):,:,:], video[:,:,:-(9+16+16),:,:]], dim=2)
+        # video = torch.cat([video[:,:,-(9+16):,:,:], video[:,:,:-(9+16),:,:]], dim=2)
         print(video.shape)
 
         # post-processing (surface normals)

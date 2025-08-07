@@ -17,9 +17,8 @@ from typing import Callable, Dict, Tuple, Union, Optional
 
 import numpy as np
 import torch
-from torch import Tensor
-import torch.nn.functional as F
 from megatron.core import parallel_state
+from torch import Tensor
 from tqdm import tqdm
 
 from cosmos_predict1.diffusion.conditioner import VideoDiffusionRendererCondition
@@ -137,6 +136,7 @@ class DiffusionRendererModel(DiffusionT2WModel):
         Returns:
             Tensor: Generated samples after diffusion sampling
         """
+        # num_steps = 4
         self.scheduler.set_timesteps(num_steps)
 
         xt = torch.randn(size=(n_sample, 2) + tuple(state_shape)) * self.scheduler.init_noise_sigma
@@ -145,30 +145,20 @@ class DiffusionRendererModel(DiffusionT2WModel):
             xt = split_inputs_cp(x=xt, seq_dim=2, cp_group=self.net.cp_group)
 
         rgb = data_batch["rgb"]
+        latent_starts = torch.arange((state_shape[1] // 2)) * 2
+        # latent_starts = torch.arange((state_shape[1] // 4)) * 4
+        print(latent_starts, xt.shape)
         for i, t in enumerate(tqdm(self.scheduler.timesteps)):
             xt = xt.to(**self.tensor_kwargs)
             xt_scaled = self.scheduler.scale_model_input(xt, timestep=t)
             # Predict the noise residual
             t = t.to(**self.tensor_kwargs)
-            # net_output_cond = self.net(x=xt_scaled, timesteps=t, **condition.to_dict())
-            # net_output = net_output_cond
-            # if guidance > 0:
-            #     net_output_uncond = self.net(x=xt_scaled, timesteps=t, **uncondition.to_dict())
-            #     net_output = net_output_cond + guidance * (net_output_cond - net_output_uncond)
-            # Compute the previous noisy sample x_t -> x_t-1
-            # xt = self.scheduler.step(net_output, t, xt).prev_sample
-
-            # latent_starts = torch.arange((state_shape[1] // 2)) * 2
-            latent_starts = torch.arange((state_shape[1] // 4)) * 4
-            print(latent_starts)
             
             xt_output = torch.zeros_like(xt)
-            print(xt.shape)
-
             for latent_start in tqdm(latent_starts):
                 latent_end = latent_start + 8
-                rgb_start = 32 * (latent_start // 4)
-                rgb_end = 32 * (latent_end // 4)
+                rgb_start = 8 * latent_start
+                rgb_end = 8 * latent_end
                 # print(latent_start, latent_end, rgb_start, rgb_end)
                 
                 if rgb_end <= rgb.shape[2]:
@@ -191,41 +181,37 @@ class DiffusionRendererModel(DiffusionT2WModel):
                 brick_output = self.net(x=x, timesteps=t, **condition.to_dict())
 
                 if latent_end <= xt_scaled.shape[3]:
-                    # xt_output[:,0,:, latent_start:latent_start+1, :,:] += brick_output[:,:,0:1,...]
-                    # xt_output[:,0,:, latent_start+1:latent_end:2, :,:] += (brick_output[:,:,1:8:2,...] / 4.0)
-                    # xt_output[:,0,:, latent_start+1:latent_end:2, :,:] += (brick_output[:,:,1:8:2,...] / 4.0)
-                    # xt_output[:,1,:, latent_start+2:latent_end, :,:] += (brick_output[:,:,2:8,...] / 3.0)
-                    xt_output[:,0,:, latent_start+0:latent_start+1, :,:] += brick_output[:,:,0:1,...]
-                    xt_output[:,0,:, latent_start+1:latent_start+4, :,:] += (brick_output[:,:,1:4,...] / 2.0)
-                    xt_output[:,0,:, latent_start+5:latent_start+8, :,:] += (brick_output[:,:,5:8,...] / 2.0)
-                    xt_output[:,1,:, latent_start+2:latent_start+4, :,:] += (brick_output[:,:,2:4,...] / 2.0)
-                    xt_output[:,1,:, latent_start+4:latent_start+6, :,:] += brick_output[:,:,4:6,...]
-                    xt_output[:,1,:, latent_start+6:latent_start+8, :,:] += (brick_output[:,:,6:8,...] / 2.0)
+                    xt_output[:,0,:, latent_start:latent_start+1, :,:] += brick_output[:,:,0:1,...]
+                    xt_output[:,0,:, latent_start+1:latent_end:2, :,:] += (brick_output[:,:,1:8:2,...] / 4.0)
+                    xt_output[:,0,:, latent_start+1:latent_end:2, :,:] += (brick_output[:,:,1:8:2,...] / 4.0)
+                    xt_output[:,1,:, latent_start+2:latent_end, :,:] += (brick_output[:,:,2:8,...] / 3.0)
+                    # xt_output[:,0,:, latent_start+0:latent_start+1, :,:] += brick_output[:,:,0:1,...]
+                    # xt_output[:,0,:, latent_start+1:latent_start+4, :,:] += (brick_output[:,:,1:4,...] / 2.0)
+                    # xt_output[:,0,:, latent_start+5:latent_start+8, :,:] += (brick_output[:,:,5:8,...] / 2.0)
+                    # xt_output[:,1,:, latent_start+2:latent_start+4, :,:] += (brick_output[:,:,2:4,...] / 2.0)
+                    # xt_output[:,1,:, latent_start+4:latent_start+6, :,:] += brick_output[:,:,4:6,...]
+                    # xt_output[:,1,:, latent_start+6:latent_start+8, :,:] += (brick_output[:,:,6:8,...] / 2.0)
                 else:
-                    # l = xt_scaled.shape[3] - latent_start
-                    # r = latent_end - xt_scaled.shape[3]
-                    # xt_output[:,0,:, latent_start:latent_start+1, :,:] += brick_output[:,:,0:1,...]
-                    # xt_output[:,0,:, latent_start+1:latent_start+l:2, :,:] += (brick_output[:,:,1:l:2,...] / 4.0)
-                    # xt_output[:,0,:, 1:r:2, :,:] += (brick_output[:,:,l+1::2,...] / 4.0)
-                    # xt_output[:,1,:, latent_start+2: , :,:] += (brick_output[:,:,2:l,...] / 3.0)
-                    # xt_output[:,1,:, :r , :,:] += (brick_output[:,:,l:,...] / 3.0)
-                    xt_output[:,0,:, latent_start+0:latent_start+1, :,:] += brick_output[:,:,0:1,...]
-                    xt_output[:,0,:, latent_start+1:latent_start+4, :,:] += (brick_output[:,:,1:4,...] / 2.0)
-                    xt_output[:,0,:, 1:4, :,:] += (brick_output[:,:,5:8,...] / 2.0)
-                    xt_output[:,1,:, latent_start+2:latent_start+4, :,:] += (brick_output[:,:,2:4,...] / 2.0)
-                    xt_output[:,1,:, 0:2, :,:] += brick_output[:,:,4:6,...]
-                    xt_output[:,1,:, 2:4, :,:] += (brick_output[:,:,6:8,...] / 2.0)
+                    l = xt_scaled.shape[3] - latent_start
+                    r = latent_end - xt_scaled.shape[3]
+                    xt_output[:,0,:, latent_start:latent_start+1, :,:] += brick_output[:,:,0:1,...]
+                    xt_output[:,0,:, latent_start+1:latent_start+l:2, :,:] += (brick_output[:,:,1:l:2,...] / 4.0)
+                    xt_output[:,0,:, 1:r:2, :,:] += (brick_output[:,:,l+1::2,...] / 4.0)
+                    xt_output[:,1,:, latent_start+2: , :,:] += (brick_output[:,:,2:l,...] / 3.0)
+                    xt_output[:,1,:, :r , :,:] += (brick_output[:,:,l:,...] / 3.0)
+                    # xt_output[:,0,:, latent_start+0:latent_start+1, :,:] += brick_output[:,:,0:1,...]
+                    # xt_output[:,0,:, latent_start+1:latent_start+4, :,:] += (brick_output[:,:,1:4,...] / 2.0)
+                    # xt_output[:,0,:, 1:4, :,:] += (brick_output[:,:,5:8,...] / 2.0)
+                    # xt_output[:,1,:, latent_start+2:latent_start+4, :,:] += (brick_output[:,:,2:4,...] / 2.0)
+                    # xt_output[:,1,:, 0:2, :,:] += brick_output[:,:,4:6,...]
+                    # xt_output[:,1,:, 2:4, :,:] += (brick_output[:,:,6:8,...] / 2.0)
                 
             xt = self.scheduler.step(xt_output, t, xt).prev_sample
-        # samples = xt
 
         samples_list = []
-        # latent_starts = torch.arange((state_shape[1] // 2)) * 2
-        latent_starts = torch.arange((state_shape[1] // 4)) * 4
         for latent_start in latent_starts:
             latent_end = latent_start + 8
             sample0 = xt[:,0,:, latent_start: latent_start+2, ...]
-            # sample0 = xt[:,1,:, latent_start: latent_start+2, ...]
             if latent_end <= xt.shape[3]:
                 sample1 = xt[:,1,:,latent_start+2:latent_end,:,:]
             else:
