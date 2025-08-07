@@ -21,13 +21,13 @@ It is a major update of our original [DiffusionRenderer](https://research.nvidia
 ### Minimum requirements
 
 - Python 3.10
-- NVIDIA GPU with at least 16GB VRAM, recommend to have >=24GB VRAM 
+- NVIDIA GPU with at least 16GB VRAM, recommend to have >=48GB VRAM 
 - NVIDIA drivers and CUDA 12.0 or higher
 - At least 70GB free disk space
 
 The installation has been tested on:
 - Ubuntu 20.04
-- NVIDIA A100 GPU (80GB VRAM), NVIDIA A5000 GPU (24GB VRAM)
+- NVIDIA A100 GPU (80GB VRAM), NVIDIA A6000 GPU (48GB VRAM)
 
 
 ### Conda environment 
@@ -58,7 +58,7 @@ For platforms other than ubuntu, check [nvdiffrast official documentation](https
 
 ### Download model weights (~56GB) 
 
-The model weights are available on [Hugging Face](https://huggingface.co/collections/zianw/diffusionrenderer-cosmos-6849f2a4da267e55409b8125).
+The model weights are available on [Hugging Face](https://huggingface.co/collections/nvidia/cosmos-diffusionrenderer-6893a56d79182313b01c777e).
 
 1. Generate a [Hugging Face](https://huggingface.co/settings/tokens) access token (if you haven't done so already). Set the access token to `Read` permission (default is `Fine-grained`).
 
@@ -67,7 +67,7 @@ The model weights are available on [Hugging Face](https://huggingface.co/collect
    huggingface-cli login
    ```
 
-3. Download the DiffusionRenderer model weights from [Hugging Face](https://huggingface.co/collections/zianw/diffusionrenderer-cosmos-6849f2a4da267e55409b8125):
+3. Download the DiffusionRenderer model weights from [Hugging Face](https://huggingface.co/collections/nvidia/cosmos-diffusionrenderer-6893a56d79182313b01c777e):
    ```bash
    CUDA_HOME=$CONDA_PREFIX PYTHONPATH=$(pwd) python scripts/download_diffusion_renderer_checkpoints.py --checkpoint_dir checkpoints
    ```
