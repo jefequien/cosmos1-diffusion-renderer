@@ -137,7 +137,6 @@ class DiffusionRendererModel(DiffusionT2WModel):
         Returns:
             Tensor: Generated samples after diffusion sampling
         """
-        # num_steps = 4
         self.scheduler.set_timesteps(num_steps)
 
         xt = torch.randn(size=(n_sample, 2) + tuple(state_shape)) * self.scheduler.init_noise_sigma
@@ -165,19 +164,6 @@ class DiffusionRendererModel(DiffusionT2WModel):
             
             xt_output = torch.zeros_like(xt)
             print(xt.shape)
-
-            # for latent_starts_chunk in latent_starts.reshape((-1, 8)):
-            #     print(latent_starts_chunk)
-            #     rgb_list = []
-            #     for latent_start in latent_starts_chunk:
-            #         rgb_list.extend([rgb[:,:,8 * latent_start + 7:8 * latent_start + 8, ...]] * 8)
-            #     data_batch["rgb"] = torch.cat(rgb_list, dim=2)
-            #     data_batch["rgb"] = data_batch["rgb"][:,:,7:,...] # Drop first 7 frames
-            #     condition, _ = self._get_conditions(data_batch, is_negative_prompt)
-            #     x = xt_scaled[:,0,:,latent_starts_chunk,:,:]
-            #     brick_output = self.net(x=x, timesteps=t, **condition.to_dict())
-            #     xt_output[:,0,:, latent_starts_chunk, :,:] += brick_output * 0.5
-
 
             for latent_start in tqdm(latent_starts):
                 latent_end = latent_start + 8
@@ -255,78 +241,3 @@ class DiffusionRendererModel(DiffusionT2WModel):
             samples = cat_outputs_cp(samples, seq_dim=2, cp_group=self.net.cp_group)
 
         return samples
-
-# def float_slice_along_D(latent, start_d, end_d, out_d):
-#     """
-#     Extract float-aligned depth slice from `latent` (B, C, D, H, W).
-#     Returns (B, C, out_d, H, W).
-#     """
-#     B, C, D, H, W = latent.shape
-#     device = latent.device
-#     dtype = latent.dtype  # Match dtype
-
-#     # Depth coordinates from start_d to end_d
-#     d_coords = torch.linspace(start_d, end_d, steps=out_d, device=device, dtype=dtype)
-#     d_coords = d_coords / (D - 1) * 2 - 1  # normalize to [-1, 1]
-
-#     # Grid coords
-#     grid_d = d_coords.view(out_d, 1, 1).expand(out_d, H, W)
-#     grid_h = torch.linspace(-1, 1, H, device=device, dtype=dtype).view(1, H, 1).expand(out_d, H, W)
-#     grid_w = torch.linspace(-1, 1, W, device=device, dtype=dtype).view(1, 1, W).expand(out_d, H, W)
-
-#     grid = torch.stack((grid_d, grid_h, grid_w), dim=-1).unsqueeze(0)  # (1, out_d, H, W, 3)
-
-#     # Sample
-#     sliced = F.grid_sample(
-#         latent, grid, mode='bilinear', padding_mode='border', align_corners=True
-#     )
-#     return sliced
-
-# def apply_subpixel_patch_along_D(latent, update_patch, latent_start, latent_end):
-#     """
-#     Applies update_patch (1, C, d, H, W) into latent (1, C, D, H, W),
-#     interpolated over float range [latent_start, latent_end] in D.
-#     """
-#     assert latent.dim() == 5 and update_patch.dim() == 5
-#     B, C, D, H, W = latent.shape
-#     _, _, d, h, w = update_patch.shape
-#     assert B == 1, "Only batch size = 1 is supported"
-
-#     device = latent.device
-#     dtype = latent.dtype
-
-#     # Create target depth grid for patch
-#     d_coords = torch.linspace(latent_start, latent_end, steps=d, device=device, dtype=dtype)
-#     d_coords_norm = d_coords / (D - 1) * 2 - 1  # Normalize to [-1, 1]
-
-#     # Build full sampling grid
-#     grid_d = d_coords_norm.view(d, 1, 1).expand(d, h, w)
-#     grid_h = torch.linspace(-1, 1, h, device=device, dtype=dtype).view(1, h, 1).expand(d, h, w)
-#     grid_w = torch.linspace(-1, 1, w, device=device, dtype=dtype).view(1, 1, w).expand(d, h, w)
-#     grid = torch.stack((grid_d, grid_h, grid_w), dim=-1).unsqueeze(0)  # (1, d, h, w, 3)
-
-#     # Warp update_patch into latent's coordinate frame
-#     warped_patch = F.grid_sample(
-#         update_patch, grid, mode='bilinear', padding_mode='zeros', align_corners=True
-#     )
-#     warped_mask = F.grid_sample(
-#         torch.ones_like(update_patch), grid, mode='bilinear', padding_mode='zeros', align_corners=True
-#     )
-
-#     # Determine integer slice range
-#     d_start_idx = max(int(torch.floor(latent_start)), 0)
-#     d_end_idx = min(int(torch.ceil(latent_end)), D)
-
-#     # Figure out the mapping range for slicing
-#     latent_slice_len = d_end_idx - d_start_idx
-#     if latent_slice_len != d:
-#         # Resize warped_patch/mask to match latent slice length
-#         warped_patch = F.interpolate(warped_patch, size=(latent_slice_len, h, w), mode='trilinear', align_corners=True)
-#         warped_mask = F.interpolate(warped_mask, size=(latent_slice_len, h, w), mode='trilinear', align_corners=True)
-
-#     # Insert into latent
-#     latent_slice = latent[:, :, d_start_idx:d_end_idx, :, :]
-#     blended_slice = latent_slice * (1 - warped_mask) + warped_patch
-#     latent[:, :, d_start_idx:d_end_idx, :, :] = blended_slice
-
-#     return latent

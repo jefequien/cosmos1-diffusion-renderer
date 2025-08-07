@@ -139,9 +139,6 @@ class DiffusionRendererPipeline(DiffusionText2WorldGenerationPipeline):
         # prepare state_shape
         C = self.model.tokenizer.channel
         # F = (data_batch['video'].shape[2] - 1) // 8 + 1
-        # F = (data_batch['video'].shape[2]) // 8 + 1
-        # F = (data_batch['video'].shape[2] // 56) * 7
-        # F = (data_batch['video'].shape[2] // 48) * 6
         F = (data_batch['video'].shape[2] // 64) * 8
         H = data_batch['video'].shape[3] // self.model.tokenizer.spatial_compression_factor
         W = data_batch['video'].shape[4] // self.model.tokenizer.spatial_compression_factor
@@ -166,15 +163,10 @@ class DiffusionRendererPipeline(DiffusionText2WorldGenerationPipeline):
         video = self.model.decode(sample)
         print(video.shape)
         video = rearrange(video, "b c (n l) h w -> b c n l h w", l=57)
-        # video = video[:,:,:,9:,...]
-        # video0 = rearrange(video[:,:,0::3,:,:,:], "b c n l h w -> b c (n l) h w")
-        # video1 = rearrange(video[:,:,1::3,:,:,:], "b c n l h w -> b c (n l) h w")
-        # video2 = rearrange(video[:,:,2::3,:,:,:], "b c n l h w -> b c (n l) h w")
-        # video1 = torch.cat([video1[:,:,-16:,:,:], video1[:,:,:-16,:,:]], dim=2)
-        # video2 = torch.cat([video2[:,:,-32:,:,:], video2[:,:,:-32,:,:]], dim=2)
-        # video = (video0 + video1 + video2) / 3.0
+        # Only keep end of each clip because that part is most consistent
         video = video[:,:,:,9+16:,...]
         video = rearrange(video, "b c n l h w -> b c (n l) h w")
+        # Move frames at the end to beginning to align with rgb video
         video = torch.cat([video[:,:,-(9+16):,:,:], video[:,:,:-(9+16),:,:]], dim=2)
         print(video.shape)
 
