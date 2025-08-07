@@ -17,6 +17,7 @@ import numpy as np
 from typing import Any, Optional, Tuple, Dict
 
 import torch
+from einops import rearrange
 from cosmos_predict1.diffusion.inference.inference_utils import (
     load_model_by_config,
     load_network_model,
@@ -137,7 +138,11 @@ class DiffusionRendererPipeline(DiffusionText2WorldGenerationPipeline):
 
         # prepare state_shape
         C = self.model.tokenizer.channel
-        F = (data_batch['video'].shape[2] - 1) // 8 + 1
+        # F = (data_batch['video'].shape[2] - 1) // 8 + 1
+        # F = (data_batch['video'].shape[2]) // 8 + 1
+        # F = (data_batch['video'].shape[2] // 56) * 7
+        # F = (data_batch['video'].shape[2] // 48) * 6
+        F = (data_batch['video'].shape[2] // 64) * 8
         H = data_batch['video'].shape[3] // self.model.tokenizer.spatial_compression_factor
         W = data_batch['video'].shape[4] // self.model.tokenizer.spatial_compression_factor
         state_shape = [C, F, H, W]
@@ -159,6 +164,19 @@ class DiffusionRendererPipeline(DiffusionText2WorldGenerationPipeline):
             self._load_tokenizer()
 
         video = self.model.decode(sample)
+        print(video.shape)
+        video = rearrange(video, "b c (n l) h w -> b c n l h w", l=57)
+        # video = video[:,:,:,9:,...]
+        # video0 = rearrange(video[:,:,0::3,:,:,:], "b c n l h w -> b c (n l) h w")
+        # video1 = rearrange(video[:,:,1::3,:,:,:], "b c n l h w -> b c (n l) h w")
+        # video2 = rearrange(video[:,:,2::3,:,:,:], "b c n l h w -> b c (n l) h w")
+        # video1 = torch.cat([video1[:,:,-16:,:,:], video1[:,:,:-16,:,:]], dim=2)
+        # video2 = torch.cat([video2[:,:,-32:,:,:], video2[:,:,:-32,:,:]], dim=2)
+        # video = (video0 + video1 + video2) / 3.0
+        video = video[:,:,:,9+16:,...]
+        video = rearrange(video, "b c n l h w -> b c (n l) h w")
+        video = torch.cat([video[:,:,-(9+16):,:,:], video[:,:,:-(9+16),:,:]], dim=2)
+        print(video.shape)
 
         # post-processing (surface normals)
         if normalize_normal:

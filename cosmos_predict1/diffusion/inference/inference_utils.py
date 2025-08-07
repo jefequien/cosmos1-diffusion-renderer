@@ -119,7 +119,9 @@ def add_common_arguments(parser):
         "--num_video_frames",
         type=int,
         default=57,
-        choices=[8 * n + 1 for n in range(16)] + [10, 117],
+        # choices=[8 * n + 1 for n in range(128)] + [10, 117],
+        # choices=[56 * n for n in range(32)],
+        choices=[64 * n for n in range(32)],
         help="Number of video frames to sample",
     )
     parser.add_argument("--height", type=int, default=704, help="Height of video to sample")
